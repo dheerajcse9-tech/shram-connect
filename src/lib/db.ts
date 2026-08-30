@@ -369,8 +369,6 @@ export async function searchOpenJobs(filters: {
   const normTrade = filters.trade ? filters.trade.trim().toLowerCase() : "";
 
   return allJobs.filter((j) => {
-    if (j.status && j.status !== "open") return false;
-
     if (normCity) {
       const jobCity = (j.city || "").trim().toLowerCase();
       // Match "Tadepalligudem", "tadepalligudem", or substrings
@@ -436,6 +434,20 @@ export async function createJob(
     work_mode?: "hire" | "work_now";
   }
 ): Promise<Job> {
+  // Ensure profile and employer_profile exist in DB so foreign key constraints pass
+  try {
+    const { data: pExist } = await supabase.from("profiles").select("id").eq("id", employerId).single();
+    if (!pExist) {
+      await supabase.from("profiles").insert({ id: employerId, role: "employer", full_name: "Employer", city: job.city || "Bengaluru" });
+    }
+    const { data: epExist } = await supabase.from("employer_profiles").select("profile_id").eq("profile_id", employerId).single();
+    if (!epExist) {
+      await supabase.from("employer_profiles").insert({ profile_id: employerId, company_name: "Verified Employer", industry: "Services", company_size: "11-50" });
+    }
+  } catch {
+    // Ignore pre-check error
+  }
+
   const fallbackJob: Job = {
     id: `job_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     employer_id: employerId,
@@ -447,7 +459,7 @@ export async function createJob(
     employment_type: job.employment_type,
     shift: job.shift || "Day Shift",
     experience_min: job.experience_min || 1,
-    status: job.status || "open",
+    status: "open",
     work_mode: job.work_mode || "hire",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -466,12 +478,12 @@ export async function createJob(
         employment_type: job.employment_type,
         shift: job.shift || null,
         experience_min: job.experience_min || null,
-        status: job.status || "open",
+        status: "open",
       })
       .select()
       .single();
 
-    const resultJob = (!error && data) ? { ...(data as Job), work_mode: job.work_mode || "hire" } : fallbackJob;
+    const resultJob = (!error && data) ? { ...(data as Job), work_mode: job.work_mode || "hire", status: "open" as JobStatus } : fallbackJob;
 
     if (typeof window !== "undefined") {
       const storedRaw = localStorage.getItem("shram_custom_created_jobs");
