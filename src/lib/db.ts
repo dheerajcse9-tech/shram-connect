@@ -321,11 +321,10 @@ export async function ensureSkillsExist(skillNames: { name: string; category: st
 export async function getOpenJobs(limit: number = 50): Promise<Job[]> {
   let dbJobs: Job[] = [];
   try {
-    // 1. Primary relational query
+    // 1. Primary relational query for all posted jobs
     const { data, error } = await supabase
       .from("jobs")
       .select("*, employer_profiles(*)")
-      .eq("status", "open")
       .order("created_at", { ascending: false })
       .limit(limit);
 
@@ -336,7 +335,6 @@ export async function getOpenJobs(limit: number = 50): Promise<Job[]> {
       const { data: simpleData, error: simpleErr } = await supabase
         .from("jobs")
         .select("*")
-        .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(limit);
 
