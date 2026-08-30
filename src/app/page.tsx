@@ -760,6 +760,18 @@ export default function Home() {
     }
   };
 
+  // Cancel Worker Application
+  const handleCancelApplication = async (appId: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Are you sure you want to cancel this job application?")) return;
+    try {
+      await supabase.from("applications").delete().eq("id", appId);
+    } catch (err) {
+      console.error("Error deleting application:", err);
+    }
+    setMyApplicationsList((prev) => prev.filter((a) => a.id !== appId));
+    showToastMsg("Application cancelled successfully.");
+  };
+
   // Profile Edit Save
   const handleSaveProfileEdits = async (name: string, city: string, phone: string) => {
     if (!supaUser) return;
@@ -866,6 +878,16 @@ export default function Home() {
       if (searchWorkModeFilter !== "all") {
         const jMode = job.work_mode || "hire";
         if (jMode !== searchWorkModeFilter) return false;
+      }
+
+      // Min Match Score filter (e.g. 85%+ or 75%+)
+      if (searchMinMatchFilter > 0) {
+        const matchResult = calculateJobSkillMatch(job, userSkills, workerSetupData.tradeName, profile?.city || "");
+        const titleLower = (job.title || "").toLowerCase();
+        const workerTradeLower = (workerSetupData.tradeName || "").toLowerCase().trim();
+        const isTradeMatch = workerTradeLower !== "" && titleLower.includes(workerTradeLower);
+        const finalScore = isTradeMatch ? Math.max(matchResult.score, 85) : matchResult.score;
+        if (finalScore < searchMinMatchFilter) return false;
       }
 
       return true;
@@ -1019,6 +1041,31 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* LANDING PAGE FOOTER */}
+        <footer
+          style={{
+            marginTop: "60px",
+            padding: "28px 24px",
+            borderTop: "1px solid rgba(0,0,0,0.06)",
+            textAlign: "center",
+            fontSize: "13px",
+            color: "#64748b",
+            background: "rgba(255,255,255,0.7)",
+            borderRadius: "16px",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div style={{ fontWeight: 800, color: "#0f172a", fontSize: "18px", marginBottom: "6px" }}>
+            Shram<span style={{ color: "#ea580c" }}>Connect</span>
+          </div>
+          <p style={{ margin: "0 0 10px", color: "#64748b" }}>
+            Empowering India's Skilled Workforce with Verified Skill Passports & Transparent Direct Hiring
+          </p>
+          <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+            © 2026 ShramConnect. All rights reserved. · Workforce Connect '26 Hackathon
+          </div>
+        </footer>
 
         {toast && <div className="toast">✓ {toast}</div>}
       </div>
@@ -2072,13 +2119,40 @@ export default function Home() {
                         <h3>Job Description</h3>
                         <p style={{ fontSize: "13px", lineHeight: "1.5", color: "#475569" }}>{activeJob.description}</p>
 
-                        <button
-                          className={isApplied ? "applied-wide" : "primary-wide"}
-                          disabled={isApplied}
-                          onClick={() => handleApplyToJob(activeJob.id)}
-                        >
-                          {isApplied ? "Application Submitted ✓" : "Apply with Skill Passport ➔"}
-                        </button>
+                        {isApplied ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                            <button className="applied-wide" disabled style={{ width: "100%" }}>
+                              Application Submitted ✓
+                            </button>
+                            <button
+                              type="button"
+                              style={{
+                                width: "100%",
+                                padding: "10px",
+                                background: "#fef2f2",
+                                color: "#dc2626",
+                                border: "1px solid #fca5a5",
+                                borderRadius: "10px",
+                                fontWeight: 700,
+                                fontSize: "13px",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => {
+                                const app = myApplicationsList.find((a) => a.job_id === activeJob.id);
+                                if (app) handleCancelApplication(app.id);
+                              }}
+                            >
+                              🗑️ Cancel Application
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="primary-wide"
+                            onClick={() => handleApplyToJob(activeJob.id)}
+                          >
+                            Apply with Skill Passport ➔
+                          </button>
+                        )}
                       </div>
                     );
                   })()}
@@ -2135,9 +2209,27 @@ export default function Home() {
                         <h3>{app.jobs?.title}</h3>
                         <p>{app.jobs?.employer_profiles?.company_name || "Employer"} · {app.jobs?.city}</p>
                       </div>
-                      <div className="application-status">
-                        <span className={`status ${app.status.toLowerCase()}`}>{app.status.toUpperCase()}</span>
-                        <small>Applied: {new Date(app.applied_at).toLocaleDateString()}</small>
+                      <div className="application-status" style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                        <div>
+                          <span className={`status ${app.status.toLowerCase()}`}>{app.status.toUpperCase()}</span>
+                          <small style={{ display: "block", marginTop: "2px" }}>Applied: {new Date(app.applied_at).toLocaleDateString()}</small>
+                        </div>
+                        <button
+                          type="button"
+                          style={{
+                            padding: "6px 12px",
+                            background: "#fef2f2",
+                            color: "#dc2626",
+                            border: "1px solid #fca5a5",
+                            borderRadius: "8px",
+                            fontWeight: 700,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                          }}
+                          onClick={() => handleCancelApplication(app.id)}
+                        >
+                          🗑️ Cancel
+                        </button>
                       </div>
                     </div>
                   ))
@@ -2622,6 +2714,31 @@ export default function Home() {
             </div>
           )}
 
+          {/* GLOBAL APP SHELL FOOTER */}
+          <footer
+            style={{
+              marginTop: "48px",
+              padding: "24px 0 12px",
+              borderTop: "1px solid var(--line)",
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "12px",
+              fontSize: "13px",
+              color: "var(--muted)",
+            }}
+          >
+            <div>
+              <strong style={{ color: "#0f172a", fontWeight: 700 }}>Shram<span style={{ color: "#ea580c" }}>Connect</span></strong> — Skills Meet Opportunities
+            </div>
+            <div>
+              Verified Blue-Collar Skill Passport & Direct Recruitment Platform
+            </div>
+            <div style={{ fontSize: "12px" }}>
+              © 2026 ShramConnect · Workforce Connect '26 Hackathon
+            </div>
+          </footer>
         </div>
       </main>
 
