@@ -318,178 +318,42 @@ export async function ensureSkillsExist(skillNames: { name: string; category: st
 
 // ─── Job Operations ──────────────────────────────────────────
 
-// ─── Default Verified Active Jobs (Guarantees robust initial feed for new accounts) ───
-export const DEFAULT_SHRAM_JOBS: Job[] = [
-  {
-    id: "job_def_101",
-    employer_id: "emp_def_101",
-    title: "Industrial Electrician",
-    description: "Urgent requirement for certified industrial electrician to manage 3-phase wiring, motor controls, and troubleshooting in manufacturing unit.",
-    city: "Tadepalligudem",
-    pay_min: 18000,
-    pay_max: 25000,
-    employment_type: "Full-time",
-    shift: "Day Shift",
-    experience_min: 2,
-    status: "open",
-    work_mode: "hire",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    employer_profiles: {
-      profile_id: "emp_def_101",
-      company_name: "Apex Power & Electricals",
-      industry: "Electrical & Power Systems",
-      company_size: "51-200",
-      verification_status: "verified",
-    },
-  },
-  {
-    id: "job_def_102",
-    employer_id: "emp_def_102",
-    title: "MIG / TIG Welder & Fitter",
-    description: "Structural steel fabrication plant requires experienced welder and fitter for heavy equipment assembly.",
-    city: "Vizag",
-    pay_min: 16000,
-    pay_max: 22000,
-    employment_type: "Contract",
-    shift: "Rotational",
-    experience_min: 1,
-    status: "open",
-    work_mode: "hire",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    employer_profiles: {
-      profile_id: "emp_def_102",
-      company_name: "Vizag Steel Fabricators",
-      industry: "Manufacturing & Industrial",
-      company_size: "11-50",
-      verification_status: "verified",
-    },
-  },
-  {
-    id: "job_def_103",
-    employer_id: "emp_def_103",
-    title: "Plumbing Technician",
-    description: "Residential & commercial plumbing installations, pipe fitting, and sanitation repair specialist.",
-    city: "Hyderabad",
-    pay_min: 15000,
-    pay_max: 20000,
-    employment_type: "Full-time",
-    shift: "Day Shift",
-    experience_min: 1,
-    status: "open",
-    work_mode: "hire",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    employer_profiles: {
-      profile_id: "emp_def_103",
-      company_name: "Deccan Sanitation Corp",
-      industry: "Plumbing & Sanitation",
-      company_size: "11-50",
-      verification_status: "verified",
-    },
-  },
-  {
-    id: "job_def_104",
-    employer_id: "emp_def_104",
-    title: "Commercial Heavy Driver",
-    description: "Hiring experienced heavy vehicle driver for inter-state logistics cargo transport. Valid HMV license mandatory.",
-    city: "Bengaluru",
-    pay_min: 22000,
-    pay_max: 30000,
-    employment_type: "Full-time",
-    shift: "Flexi / Night",
-    experience_min: 3,
-    status: "open",
-    work_mode: "hire",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    employer_profiles: {
-      profile_id: "emp_def_104",
-      company_name: "TransSpeed Logistics",
-      industry: "Logistics & Warehousing",
-      company_size: "201-500",
-      verification_status: "verified",
-    },
-  },
-  {
-    id: "job_def_105",
-    employer_id: "emp_def_105",
-    title: "Chef / Head Cook",
-    description: "Institutional cafeteria requires experienced cook for North/South Indian food preparation.",
-    city: "Tadepalligudem",
-    pay_min: 14000,
-    pay_max: 18000,
-    employment_type: "Full-time",
-    shift: "Morning Shift",
-    experience_min: 2,
-    status: "open",
-    work_mode: "hire",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    employer_profiles: {
-      profile_id: "emp_def_105",
-      company_name: "Annapurna Foods & Catering",
-      industry: "Retail & Commercial",
-      company_size: "1-10",
-      verification_status: "verified",
-    },
-  },
-  {
-    id: "job_def_106",
-    employer_id: "emp_def_106",
-    title: "CNC Machine Operator",
-    description: "Precision component manufacturing plant hiring CNC lathe and milling operator.",
-    city: "Chennai",
-    pay_min: 19000,
-    pay_max: 26000,
-    employment_type: "Full-time",
-    shift: "Rotational",
-    experience_min: 2,
-    status: "open",
-    work_mode: "hire",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    employer_profiles: {
-      profile_id: "emp_def_106",
-      company_name: "Precision Tech Auto Parts",
-      industry: "Manufacturing & Industrial",
-      company_size: "51-200",
-      verification_status: "verified",
-    },
-  },
-];
-
 export async function getOpenJobs(limit: number = 50): Promise<Job[]> {
   let dbJobs: Job[] = [];
   try {
+    // 1. Primary relational query
     const { data, error } = await supabase
       .from("jobs")
-      .select("*, employer_profiles(*), job_skills(*, skills(*))")
+      .select("*, employer_profiles(*)")
       .eq("status", "open")
       .order("created_at", { ascending: false })
       .limit(limit);
-    if (!error && data) {
+
+    if (!error && data && data.length > 0) {
       dbJobs = data as Job[];
+    } else {
+      // 2. Direct query fallback
+      const { data: simpleData, error: simpleErr } = await supabase
+        .from("jobs")
+        .select("*")
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (!simpleErr && simpleData) {
+        dbJobs = simpleData as Job[];
+      }
     }
-  } catch {
-    // Ignore error
+  } catch (err) {
+    console.error("Error fetching jobs from Supabase:", err);
   }
 
   const localJobsRaw = typeof window !== "undefined" ? localStorage.getItem("shram_custom_created_jobs") : null;
   const localJobs: Job[] = localJobsRaw ? JSON.parse(localJobsRaw) : [];
 
   const combined = [...localJobs, ...dbJobs];
-  const uniqueMap = new Map(combined.map((j) => [j.id, j]));
-
-  // Supplement baseline verified jobs so new accounts always see active job listings
-  DEFAULT_SHRAM_JOBS.forEach((dj) => {
-    if (!uniqueMap.has(dj.id)) {
-      uniqueMap.set(dj.id, dj);
-    }
-  });
-
-  return Array.from(uniqueMap.values());
+  const uniqueJobs = Array.from(new Map(combined.map((j) => [j.id, j])).values());
+  return uniqueJobs;
 }
 
 export async function searchOpenJobs(filters: {
