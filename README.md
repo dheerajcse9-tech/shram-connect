@@ -1,4 +1,4 @@
-# Workforce Connect
+# Shram Connect
 
 A hackathon-ready recruitment platform that turns informal blue-collar work history into a trusted, portable **Skill Passport** and helps employers build an explainable shortlist quickly.
 
