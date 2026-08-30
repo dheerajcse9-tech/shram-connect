@@ -383,6 +383,16 @@ export default function Home() {
     }
   }, [showToastMsg]);
 
+  // Pre-fetch open jobs from database immediately on mount for all users (new & existing)
+  useEffect(() => {
+    getOpenJobs().then((jobs) => {
+      if (jobs && jobs.length > 0) {
+        setJobsList(jobs);
+        setSelectedJobId((prev) => prev || jobs[0].id);
+      }
+    });
+  }, []);
+
   // Session listener
   useEffect(() => {
     setAuthLoading(true);

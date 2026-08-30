@@ -321,36 +321,39 @@ export async function ensureSkillsExist(skillNames: { name: string; category: st
 export async function getOpenJobs(limit: number = 50): Promise<Job[]> {
   let dbJobs: Job[] = [];
   try {
-    // 1. Primary relational query for all posted jobs
+    // Query jobs with status='open' — this is REQUIRED by RLS policy:
+    // "open jobs are visible" using (status = 'open' or employer_id = auth.uid())
+    // Workers can only see jobs where status='open'.
+    // NOTE: Do NOT join employer_profiles(*) here — employer_profiles has no
+    // public SELECT policy, so the join silently fails for worker users.
     const { data, error } = await supabase
       .from("jobs")
-      .select("*, employer_profiles(*)")
+      .select("*")
+      .eq("status", "open")
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (!error && data && data.length > 0) {
-      dbJobs = data as Job[];
-    } else {
-      // 2. Direct query fallback
-      const { data: simpleData, error: simpleErr } = await supabase
-        .from("jobs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(limit);
+    if (error) {
+      console.error("[getOpenJobs] Supabase query error:", error.message, error.code);
+    }
 
-      if (!simpleErr && simpleData) {
-        dbJobs = simpleData as Job[];
-      }
+    if (data && data.length > 0) {
+      dbJobs = data as Job[];
+      console.log(`[getOpenJobs] Fetched ${data.length} jobs from database`);
+    } else {
+      console.log("[getOpenJobs] No jobs returned from database. Error:", error?.message || "none");
     }
   } catch (err) {
-    console.error("Error fetching jobs from Supabase:", err);
+    console.error("[getOpenJobs] Exception:", err);
   }
 
+  // Also merge any locally-created jobs (same browser only)
   const localJobsRaw = typeof window !== "undefined" ? localStorage.getItem("shram_custom_created_jobs") : null;
   const localJobs: Job[] = localJobsRaw ? JSON.parse(localJobsRaw) : [];
 
-  const combined = [...localJobs, ...dbJobs];
+  const combined = [...dbJobs, ...localJobs];
   const uniqueJobs = Array.from(new Map(combined.map((j) => [j.id, j])).values());
+  console.log(`[getOpenJobs] Total unique jobs: ${uniqueJobs.length} (db: ${dbJobs.length}, local: ${localJobs.length})`);
   return uniqueJobs;
 }
 
@@ -438,14 +441,16 @@ export async function createJob(
   try {
     const { data: pExist } = await supabase.from("profiles").select("id").eq("id", employerId).single();
     if (!pExist) {
-      await supabase.from("profiles").insert({ id: employerId, role: "employer", full_name: "Employer", city: job.city || "Bengaluru" });
+      const { error: pErr } = await supabase.from("profiles").insert({ id: employerId, role: "employer", full_name: "Employer", city: job.city || "Bengaluru" });
+      console.log("[createJob] Created profiles entry:", pErr ? pErr.message : "OK");
     }
     const { data: epExist } = await supabase.from("employer_profiles").select("profile_id").eq("profile_id", employerId).single();
     if (!epExist) {
-      await supabase.from("employer_profiles").insert({ profile_id: employerId, company_name: "Verified Employer", industry: "Services", company_size: "11-50" });
+      const { error: epErr } = await supabase.from("employer_profiles").insert({ profile_id: employerId, company_name: "Verified Employer", industry: "Services", company_size: "11-50" });
+      console.log("[createJob] Created employer_profiles entry:", epErr ? epErr.message : "OK");
     }
-  } catch {
-    // Ignore pre-check error
+  } catch (preErr) {
+    console.error("[createJob] Pre-check error:", preErr);
   }
 
   const fallbackJob: Job = {
@@ -483,6 +488,13 @@ export async function createJob(
       .select()
       .single();
 
+    if (error) {
+      console.error("[createJob] DB INSERT FAILED:", error.message, error.code, error.details);
+      console.log("[createJob] Falling back to localStorage-only job");
+    } else {
+      console.log("[createJob] DB INSERT SUCCESS — job id:", data?.id);
+    }
+
     const resultJob = (!error && data) ? { ...(data as Job), work_mode: job.work_mode || "hire", status: "open" as JobStatus } : fallbackJob;
 
     if (typeof window !== "undefined") {
@@ -493,7 +505,8 @@ export async function createJob(
     }
 
     return resultJob;
-  } catch {
+  } catch (insertErr) {
+    console.error("[createJob] Exception during insert:", insertErr);
     if (typeof window !== "undefined") {
       const storedRaw = localStorage.getItem("shram_custom_created_jobs");
       const stored: Job[] = storedRaw ? JSON.parse(storedRaw) : [];
