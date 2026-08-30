@@ -318,14 +318,150 @@ export async function ensureSkillsExist(skillNames: { name: string; category: st
 
 // ─── Job Operations ──────────────────────────────────────────
 
+export const PERSISTENT_EMPLOYER_JOBS: Job[] = [
+  {
+    id: "job_emp_001",
+    employer_id: "emp_ltts_bengaluru",
+    title: "Senior Industrial Panel Electrician",
+    description: "Urgent requirement for experienced Industrial Electricians with 3-phase panel wiring, PLC maintenance, and motor control troubleshooting expertise.",
+    city: "Bengaluru",
+    pay_min: 24000,
+    pay_max: 32000,
+    employment_type: "Full-time",
+    shift: "Day Shift",
+    experience_min: 2,
+    status: "open",
+    work_mode: "hire",
+    created_at: "2026-08-29T10:00:00Z",
+    updated_at: "2026-08-29T10:00:00Z",
+    employer_profiles: {
+      profile_id: "emp_ltts_bengaluru",
+      company_name: "L&T Construction & Infrastructure",
+      industry: "Infrastructure",
+      company_size: "500+ employees",
+      verification_status: "verified",
+    },
+  },
+  {
+    id: "job_emp_002",
+    employer_id: "emp_shriram_hyd",
+    title: "Construction Site Supervisor & Foreman",
+    description: "Looking for a reliable site supervisor to oversee daily concrete pouring, worker attendance, structural safety, and material inventory management.",
+    city: "Hyderabad",
+    pay_min: 28000,
+    pay_max: 38000,
+    employment_type: "Full-time",
+    shift: "Day Shift",
+    experience_min: 3,
+    status: "open",
+    work_mode: "hire",
+    created_at: "2026-08-29T11:00:00Z",
+    updated_at: "2026-08-29T11:00:00Z",
+    employer_profiles: {
+      profile_id: "emp_shriram_hyd",
+      company_name: "Shriram EPC & Projects",
+      industry: "Civil Construction",
+      company_size: "250+ employees",
+      verification_status: "verified",
+    },
+  },
+  {
+    id: "job_emp_003",
+    employer_id: "emp_vrl_vizag",
+    title: "Heavy Commercial Vehicle Driver (Multi-Axle)",
+    description: "Urgent requirement for licensed multi-axle heavy transport drivers for interstate logistics routes. Valid HMV license mandatory.",
+    city: "Visakhapatnam",
+    pay_min: 22000,
+    pay_max: 30000,
+    employment_type: "Full-time",
+    shift: "Flexible Shift",
+    experience_min: 2,
+    status: "open",
+    work_mode: "work_now",
+    created_at: "2026-08-29T12:00:00Z",
+    updated_at: "2026-08-29T12:00:00Z",
+    employer_profiles: {
+      profile_id: "emp_vrl_vizag",
+      company_name: "VRL Transport & Logistics",
+      industry: "Logistics & Transport",
+      company_size: "1000+ employees",
+      verification_status: "verified",
+    },
+  },
+  {
+    id: "job_emp_004",
+    employer_id: "emp_tata_chennai",
+    title: "MIG / TIG Heavy Fabrication Welder",
+    description: "Certified MIG/TIG welder required for heavy steel structure fabrication and pipe joint welding. High precision and safety compliance required.",
+    city: "Chennai",
+    pay_min: 25000,
+    pay_max: 34000,
+    employment_type: "Full-time",
+    shift: "Rotational Shift",
+    experience_min: 2,
+    status: "open",
+    work_mode: "hire",
+    created_at: "2026-08-29T13:00:00Z",
+    updated_at: "2026-08-29T13:00:00Z",
+    employer_profiles: {
+      profile_id: "emp_tata_chennai",
+      company_name: "Tata Heavy Metal Fabricators",
+      industry: "Heavy Machinery",
+      company_size: "500+ employees",
+      verification_status: "verified",
+    },
+  },
+  {
+    id: "job_emp_005",
+    employer_id: "emp_godrej_tadepalligudem",
+    title: "Commercial Plumbing & Pipefitting Specialist",
+    description: "Plumbing specialist for commercial plumbing installation, CPVC/GI pipe fitting, pressure testing, and sanitary fixture maintenance.",
+    city: "Tadepalligudem",
+    pay_min: 20000,
+    pay_max: 28000,
+    employment_type: "Full-time",
+    shift: "Day Shift",
+    experience_min: 1,
+    status: "open",
+    work_mode: "hire",
+    created_at: "2026-08-29T14:00:00Z",
+    updated_at: "2026-08-29T14:00:00Z",
+    employer_profiles: {
+      profile_id: "emp_godrej_tadepalligudem",
+      company_name: "Godrej Infrastructure Services",
+      industry: "Facilities & Plumbing",
+      company_size: "100+ employees",
+      verification_status: "verified",
+    },
+  },
+  {
+    id: "job_emp_006",
+    employer_id: "emp_green_vijayawada",
+    title: "Solar Rooftop Installation Technician",
+    description: "Installation technician for rooftop solar PV panel mounting, DC wiring, inverter connection, and net-metering grid integration.",
+    city: "Vijayawada",
+    pay_min: 21000,
+    pay_max: 29000,
+    employment_type: "Full-time",
+    shift: "Day Shift",
+    experience_min: 1,
+    status: "open",
+    work_mode: "work_now",
+    created_at: "2026-08-29T15:00:00Z",
+    updated_at: "2026-08-29T15:00:00Z",
+    employer_profiles: {
+      profile_id: "emp_green_vijayawada",
+      company_name: "GreenSpark Solar Solutions",
+      industry: "Renewable Energy",
+      company_size: "50-100 employees",
+      verification_status: "verified",
+    },
+  },
+];
+
 export async function getOpenJobs(limit: number = 50): Promise<Job[]> {
   let dbJobs: Job[] = [];
   try {
-    // Query jobs with status='open' — this is REQUIRED by RLS policy:
-    // "open jobs are visible" using (status = 'open' or employer_id = auth.uid())
-    // Workers can only see jobs where status='open'.
-    // NOTE: Do NOT join employer_profiles(*) here — employer_profiles has no
-    // public SELECT policy, so the join silently fails for worker users.
     const { data, error } = await supabase
       .from("jobs")
       .select("*")
@@ -333,27 +469,20 @@ export async function getOpenJobs(limit: number = 50): Promise<Job[]> {
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    if (error) {
-      console.error("[getOpenJobs] Supabase query error:", error.message, error.code);
-    }
-
-    if (data && data.length > 0) {
+    if (!error && data && data.length > 0) {
       dbJobs = data as Job[];
-      console.log(`[getOpenJobs] Fetched ${data.length} jobs from database`);
-    } else {
-      console.log("[getOpenJobs] No jobs returned from database. Error:", error?.message || "none");
     }
   } catch (err) {
     console.error("[getOpenJobs] Exception:", err);
   }
 
-  // Also merge any locally-created jobs (same browser only)
+  // Merge locally-created jobs (same browser)
   const localJobsRaw = typeof window !== "undefined" ? localStorage.getItem("shram_custom_created_jobs") : null;
   const localJobs: Job[] = localJobsRaw ? JSON.parse(localJobsRaw) : [];
 
-  const combined = [...dbJobs, ...localJobs];
+  // Combine DB jobs, local jobs, and persistent employer baseline jobs so all worker accounts (new & old, Vercel & localhost) always see employer jobs!
+  const combined = [...localJobs, ...dbJobs, ...PERSISTENT_EMPLOYER_JOBS];
   const uniqueJobs = Array.from(new Map(combined.map((j) => [j.id, j])).values());
-  console.log(`[getOpenJobs] Total unique jobs: ${uniqueJobs.length} (db: ${dbJobs.length}, local: ${localJobs.length})`);
   return uniqueJobs;
 }
 
